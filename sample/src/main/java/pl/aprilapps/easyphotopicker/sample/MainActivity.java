@@ -266,9 +266,9 @@ public class MainActivity extends AppCompatActivity {
         protected void onPostExecute(String result) {
 
             if(result == null){
-                Toast.makeText(getApplicationContext(), "Failed to process image!", Toast.LENGTH_LONG);
+                Toast.makeText(getApplicationContext(), "Failed to process image!", Toast.LENGTH_LONG).show();
             } else {
-                Toast.makeText(getApplicationContext(), "Response: " + result, Toast.LENGTH_LONG);
+                Toast.makeText(getApplicationContext(), "Response: " + result, Toast.LENGTH_LONG).show();
             }
 
             result = null;
