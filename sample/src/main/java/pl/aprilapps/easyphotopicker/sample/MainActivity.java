@@ -3,11 +3,8 @@ package pl.aprilapps.easyphotopicker.sample;
 import android.Manifest;
 import android.content.Intent;
 import android.content.pm.PackageManager;
-import android.graphics.Bitmap;
-import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Bundle;
-import android.provider.MediaStore;
 import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.LinearLayoutManager;
@@ -15,19 +12,15 @@ import android.support.v7.widget.RecyclerView;
 import android.util.Log;
 import android.view.View;
 
-import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-import android.util.Base64;
 import android.widget.Toast;
 
 import okhttp3.MediaType;
 import okhttp3.MultipartBody;
 import okhttp3.RequestBody;
-import okhttp3.ResponseBody;
 import pl.aprilapps.easyphotopicker.DefaultCallback;
 import pl.aprilapps.easyphotopicker.EasyImage;
 import pl.tajchert.nammu.Nammu;
@@ -41,8 +34,6 @@ public class MainActivity extends AppCompatActivity {
 
     private static final String TAG = "MainActivity";
 
-    private static final String IMAGE_KEY = "image_list";
-
     protected RecyclerView recyclerView;
 
     protected View galleryButton;
@@ -50,10 +41,6 @@ public class MainActivity extends AppCompatActivity {
     private ImagesAdapter imagesAdapter;
 
     private ArrayList<File> photos = new ArrayList<>();
-
-    private Bitmap imageBitmap;
-
-    private String imageTitle;
 
     private String responseMessage;
 
@@ -66,29 +53,10 @@ public class MainActivity extends AppCompatActivity {
         recyclerView = findViewById(R.id.recycler_view);
         galleryButton = findViewById(R.id.gallery_button);
 
-        if (savedInstanceState != null) {
-            photos = (ArrayList<File>) savedInstanceState.getSerializable(IMAGE_KEY);
-        }
-
         imagesAdapter = new ImagesAdapter(this, photos);
         recyclerView.setLayoutManager(new LinearLayoutManager(this));
         recyclerView.setHasFixedSize(true);
         recyclerView.setAdapter(imagesAdapter);
-
-        int permissionCheck = ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE);
-        if (permissionCheck != PackageManager.PERMISSION_GRANTED) {
-            Nammu.askForPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE, new PermissionCallback() {
-                @Override
-                public void permissionGranted() {
-                    //Nothing, this sample saves to Public gallery so it needs permission
-                }
-
-                @Override
-                public void permissionRefused() {
-                    finish();
-                }
-            });
-        }
 
         EasyImage.configuration(this)
                 .setImagesFolderName("Softeng751")
@@ -141,12 +109,6 @@ public class MainActivity extends AppCompatActivity {
 
     }
 
-    @Override
-    public void onSaveInstanceState(Bundle outState) {
-        super.onSaveInstanceState(outState);
-        outState.putSerializable(IMAGE_KEY, photos);
-    }
-
     private void checkGalleryAppAvailability() {
         if (!EasyImage.canDeviceHandleGallery(this)) {
             //Device has no app that handles gallery intent
@@ -175,16 +137,6 @@ public class MainActivity extends AppCompatActivity {
             public void onImagesPicked(List<File> imageFiles, EasyImage.ImageSource source, int type) {
 
                 File file = imageFiles.get(0);
-/*                Uri path = Uri.fromFile(file);
-                Log.d(TAG, path.toString());
-
-                try {
-                    imageBitmap = MediaStore.Images.Media.getBitmap(getContentResolver(), path);
-                    imageTitle = file.getName();
-                    Log.d(TAG, "File name: " + imageTitle);
-                } catch (IOException e) {
-                    Log.d(TAG, "Failed to find image for conversion!");
-                }*/
 
                 processImageOnCloudTask task = new processImageOnCloudTask(file);
                 task.execute();
@@ -209,16 +161,7 @@ public class MainActivity extends AppCompatActivity {
         recyclerView.scrollToPosition(photos.size() - 1);
     }
 
-    private String imageToString(){
-        ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
-        imageBitmap.compress(Bitmap.CompressFormat.JPEG, 100, byteArrayOutputStream);
-        byte[] imageBytes = byteArrayOutputStream.toByteArray();
-        return Base64.encodeToString(imageBytes, Base64.DEFAULT);
-    }
-
     private void processImageOnCloud(File file){
-        /*String image = imageToString();
-        String title = imageTitle;*/
 
         MultipartBody.Part filePart = MultipartBody.Part.createFormData("file", file.getName(), RequestBody.create(MediaType.parse("image/*"), file));
 
@@ -226,45 +169,18 @@ public class MainActivity extends AppCompatActivity {
 
         Call<String> call = apiInterface.processImage(filePart);
 
-
-        // Log.d(TAG, "Proceed to process image, serialized image: " + image);
-
         call.enqueue(new Callback<String>() {
-                         @Override
-                         public void onResponse(Call<String> call, Response<String> response) {
-
-                             responseMessage = response.body().toString();
-                             Log.d(TAG, "Response received! Value: " + responseMessage);
-
-                         }
-
-                         @Override
-                         public void onFailure(Call<String> call, Throwable throwable) {
-
-                             Log.d(TAG, "Request failed, exception: " + throwable.toString());
-
-                         }
-                     });
-
-        /*call.enqueue(new Callback<ImageClass>() {
-
             @Override
-            public void onResponse(Call<ImageClass> call, Response<ImageClass> response) {
-
-                ImageClass imageClass = response.body();
-                responseMessage = imageClass.getResponse();
-                Log.d(TAG, "Response: " + responseMessage);
-                // Toast.makeText(MainActivity.this, "Response: " + imageClass.getResponse(), Toast.LENGTH_LONG);
+            public void onResponse(Call<String> call, Response<String> response) {
+                responseMessage = response.body().toString();
+                Log.d(TAG, "Response received! Value: " + responseMessage);
             }
 
             @Override
-            public void onFailure(Call<ImageClass> call, Throwable t) {
-
-                Log.d(TAG, "CallBack failed!");
-                // Toast.makeText(MainActivity.this, "Request failed!", Toast.LENGTH_LONG);
-
+            public void onFailure(Call<String> call, Throwable throwable) {
+                Log.d(TAG, "Request failed, exception: " + throwable.toString());
             }
-        });*/
+        });
     }
 
     @Override
