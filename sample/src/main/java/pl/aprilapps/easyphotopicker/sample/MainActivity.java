@@ -24,6 +24,10 @@ import java.util.List;
 import android.util.Base64;
 import android.widget.Toast;
 
+import okhttp3.MediaType;
+import okhttp3.MultipartBody;
+import okhttp3.RequestBody;
+import okhttp3.ResponseBody;
 import pl.aprilapps.easyphotopicker.DefaultCallback;
 import pl.aprilapps.easyphotopicker.EasyImage;
 import pl.tajchert.nammu.Nammu;
@@ -35,13 +39,9 @@ import retrofit2.Response;
 
 public class MainActivity extends AppCompatActivity {
 
-    // private static final String PHOTOS_KEY = "easy_image_photos_list";
-
     private static final String TAG = "MainActivity";
 
     private static final String IMAGE_KEY = "image_list";
-
-    private static final int IMAGE_REQUEST = 751;
 
     protected RecyclerView recyclerView;
 
@@ -91,10 +91,10 @@ public class MainActivity extends AppCompatActivity {
         }
 
         EasyImage.configuration(this)
-                .setImagesFolderName("EasyImage sample")
-                .setCopyTakenPhotosToPublicGalleryAppFolder(true)
-                .setCopyPickedImagesToPublicGalleryAppFolder(true)
-                .setAllowMultiplePickInGallery(true);
+                .setImagesFolderName("Softeng751")
+                .setCopyTakenPhotosToPublicGalleryAppFolder(false)
+                .setCopyPickedImagesToPublicGalleryAppFolder(false)
+                .setAllowMultiplePickInGallery(false);
 
         checkGalleryAppAvailability();
 
@@ -175,7 +175,7 @@ public class MainActivity extends AppCompatActivity {
             public void onImagesPicked(List<File> imageFiles, EasyImage.ImageSource source, int type) {
 
                 File file = imageFiles.get(0);
-                Uri path = Uri.fromFile(file);
+/*                Uri path = Uri.fromFile(file);
                 Log.d(TAG, path.toString());
 
                 try {
@@ -184,9 +184,9 @@ public class MainActivity extends AppCompatActivity {
                     Log.d(TAG, "File name: " + imageTitle);
                 } catch (IOException e) {
                     Log.d(TAG, "Failed to find image for conversion!");
-                }
+                }*/
 
-                processImageOnCloudTask task = new processImageOnCloudTask();
+                processImageOnCloudTask task = new processImageOnCloudTask(file);
                 task.execute();
 
                 onPhotosReturned(imageFiles);
@@ -216,15 +216,37 @@ public class MainActivity extends AppCompatActivity {
         return Base64.encodeToString(imageBytes, Base64.DEFAULT);
     }
 
-    private void processImageOnCloud(){
-        String image = imageToString();
-        String title = imageTitle;
+    private void processImageOnCloud(File file){
+        /*String image = imageToString();
+        String title = imageTitle;*/
+
+        MultipartBody.Part filePart = MultipartBody.Part.createFormData("file", file.getName(), RequestBody.create(MediaType.parse("image/*"), file));
+
         ApiInterface apiInterface = ApiClient.getApiClient().create(ApiInterface.class);
-        Call<ImageClass> call = apiInterface.processImage(title, image);
 
-        Log.d(TAG, "Proceed to process image, serialized image: " + image);
+        Call<String> call = apiInterface.processImage(filePart);
 
-        call.enqueue(new Callback<ImageClass>() {
+
+        // Log.d(TAG, "Proceed to process image, serialized image: " + image);
+
+        call.enqueue(new Callback<String>() {
+                         @Override
+                         public void onResponse(Call<String> call, Response<String> response) {
+
+                             responseMessage = response.body().toString();
+                             Log.d(TAG, "Response received! Value: " + responseMessage);
+
+                         }
+
+                         @Override
+                         public void onFailure(Call<String> call, Throwable throwable) {
+
+                             Log.d(TAG, "Request failed, exception: " + throwable.toString());
+
+                         }
+                     });
+
+        /*call.enqueue(new Callback<ImageClass>() {
 
             @Override
             public void onResponse(Call<ImageClass> call, Response<ImageClass> response) {
@@ -242,7 +264,7 @@ public class MainActivity extends AppCompatActivity {
                 // Toast.makeText(MainActivity.this, "Request failed!", Toast.LENGTH_LONG);
 
             }
-        });
+        });*/
     }
 
     @Override
@@ -254,10 +276,17 @@ public class MainActivity extends AppCompatActivity {
 
     private class processImageOnCloudTask extends AsyncTask<Void, Void, String> {
 
+        File image;
+
+        public processImageOnCloudTask(File file){
+            image = file;
+        }
+
+
         @Override
         protected String doInBackground(Void... params) {
 
-            processImageOnCloud();
+            processImageOnCloud(image);
 
             return responseMessage;
         }
