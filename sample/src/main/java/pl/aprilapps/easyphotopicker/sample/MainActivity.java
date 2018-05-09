@@ -3,6 +3,8 @@ package pl.aprilapps.easyphotopicker.sample;
 import android.Manifest;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.support.v4.content.ContextCompat;
@@ -10,12 +12,16 @@ import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.util.Log;
+import android.util.TimingLogger;
 import android.view.View;
 
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 
+import android.widget.ImageView;
+import android.widget.ProgressBar;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import okhttp3.MediaType;
@@ -34,15 +40,14 @@ public class MainActivity extends AppCompatActivity {
 
     private static final String TAG = "MainActivity";
 
-    protected RecyclerView recyclerView;
-
     protected View galleryButton;
 
-    private ImagesAdapter imagesAdapter;
+    private ImageView mainImage;
 
-    private ArrayList<File> photos = new ArrayList<>();
+    private TextView imageDetails;
 
-    private String responseMessage;
+    private ProgressBar progressBar;
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -50,13 +55,10 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
         Nammu.init(this);
 
-        recyclerView = findViewById(R.id.recycler_view);
+        mainImage = findViewById(R.id.main_image);
+        imageDetails = findViewById(R.id.image_details);
+        progressBar = findViewById(R.id.image_Progress);
         galleryButton = findViewById(R.id.gallery_button);
-
-        imagesAdapter = new ImagesAdapter(this, photos);
-        recyclerView.setLayoutManager(new LinearLayoutManager(this));
-        recyclerView.setHasFixedSize(true);
-        recyclerView.setAdapter(imagesAdapter);
 
         EasyImage.configuration(this)
                 .setImagesFolderName("Softeng751")
@@ -136,12 +138,17 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onImagesPicked(List<File> imageFiles, EasyImage.ImageSource source, int type) {
 
-                File file = imageFiles.get(0);
+                File image = imageFiles.get(0);
 
-                processImageOnCloudTask task = new processImageOnCloudTask(file);
-                task.execute();
+                Bitmap bitmap = BitmapFactory.decodeFile(image.getAbsolutePath());
 
-                onPhotosReturned(imageFiles);
+                mainImage.setImageBitmap(bitmap);
+
+                imageDetails.setText(R.string.loading_message);
+
+                progressBar.setVisibility(View.VISIBLE);
+
+                processImageOnCloud(image);
             }
 
             @Override
@@ -155,13 +162,10 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
-    private void onPhotosReturned(List<File> returnedPhotos) {
-        photos.addAll(returnedPhotos);
-        imagesAdapter.notifyDataSetChanged();
-        recyclerView.scrollToPosition(photos.size() - 1);
-    }
 
     private void processImageOnCloud(File file){
+
+        // final TimingLogger logger = new TimingLogger(TAG, "processImageOnCloud");
 
         MultipartBody.Part filePart = MultipartBody.Part.createFormData("file", file.getName(), RequestBody.create(MediaType.parse("image/*"), file));
 
@@ -172,13 +176,27 @@ public class MainActivity extends AppCompatActivity {
         call.enqueue(new Callback<String>() {
             @Override
             public void onResponse(Call<String> call, Response<String> response) {
-                responseMessage = response.body().toString();
+
+                /*logger.addSplit("Success");
+                logger.dumpToLog();*/
+
+                String responseMessage = response.body().toString();
                 Log.d(TAG, "Response received! Value: " + responseMessage);
+
+                progressBar.setVisibility(View.INVISIBLE);
+                imageDetails.setText(responseMessage);
             }
 
             @Override
             public void onFailure(Call<String> call, Throwable throwable) {
+
+                /*logger.addSplit("Failed");
+                logger.dumpToLog();*/
+
                 Log.d(TAG, "Request failed, exception: " + throwable.toString());
+
+                progressBar.setVisibility(View.INVISIBLE);
+                imageDetails.setText("Request failed!");
             }
         });
     }
@@ -190,34 +208,4 @@ public class MainActivity extends AppCompatActivity {
         super.onDestroy();
     }
 
-    private class processImageOnCloudTask extends AsyncTask<Void, Void, String> {
-
-        File image;
-
-        public processImageOnCloudTask(File file){
-            image = file;
-        }
-
-
-        @Override
-        protected String doInBackground(Void... params) {
-
-            processImageOnCloud(image);
-
-            return responseMessage;
-        }
-
-        @Override
-        protected void onPostExecute(String result) {
-
-            if(result == null){
-                Toast.makeText(getApplicationContext(), "Failed to process image!", Toast.LENGTH_LONG).show();
-            } else {
-                Toast.makeText(getApplicationContext(), "Response: " + result, Toast.LENGTH_LONG).show();
-            }
-
-            result = null;
-        }
-
-    }
 }
