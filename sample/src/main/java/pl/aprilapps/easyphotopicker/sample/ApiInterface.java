@@ -8,7 +8,7 @@ import retrofit2.http.POST;
 public interface ApiInterface {
 
     @FormUrlEncoded
-    @POST("processImage")
+    @POST("upload")
     Call<ImageClass> processImage(@Field("title") String title, @Field("image") String image);
 
 }

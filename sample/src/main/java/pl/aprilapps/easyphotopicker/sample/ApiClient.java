@@ -5,7 +5,7 @@ import retrofit2.converter.gson.GsonConverterFactory;
 
 public class ApiClient {
 
-    private static final String BASE_URL = "http://10.0.2.2/";
+    private static final String BASE_URL = "https://softeng751.azurewebsites.net/rest/";
     private static Retrofit _retrofit;
 
     public static Retrofit getApiClient(){
