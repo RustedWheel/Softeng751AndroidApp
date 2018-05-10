@@ -11,23 +11,22 @@ import android.os.Bundle;
 import android.provider.MediaStore;
 import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
-import android.support.v7.widget.LinearLayoutManager;
-import android.support.v7.widget.RecyclerView;
 import android.util.Log;
-import android.util.TimingLogger;
 import android.view.View;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.lang.ref.WeakReference;
-import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
 import android.widget.ImageView;
 import android.widget.ProgressBar;
+import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -45,6 +44,8 @@ import com.google.api.services.vision.v1.model.BatchAnnotateImagesResponse;
 import com.google.api.services.vision.v1.model.EntityAnnotation;
 import com.google.api.services.vision.v1.model.Feature;
 import com.google.api.services.vision.v1.model.Image;
+import com.google.api.services.vision.v1.model.ImageProperties;
+import com.google.api.services.vision.v1.model.SafeSearchAnnotation;
 
 import okhttp3.MediaType;
 import okhttp3.MultipartBody;
@@ -77,6 +78,11 @@ public class MainActivity extends AppCompatActivity {
 
     private ProgressBar progressBar;
 
+    private Spinner spinnerAPI;
+
+    private String[] APIs = new String[]{"AWS Tensorflow", "Google Cloud Vision"};
+
+    private String api = APIs[0];
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -88,6 +94,21 @@ public class MainActivity extends AppCompatActivity {
         imageDetails = findViewById(R.id.image_details);
         progressBar = findViewById(R.id.image_Progress);
         galleryButton = findViewById(R.id.gallery_button);
+        spinnerAPI = findViewById(R.id.spinnerAPI);
+
+        spinnerAPI.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> adapterView, View view, int i, long l) {
+                api = (String) adapterView.getItemAtPosition(i);
+            }
+            @Override
+            public void onNothingSelected(AdapterView<?> adapterView) {
+
+            }
+        });
+        ArrayAdapter<String> dataAdapter = new ArrayAdapter<String>(this, android.R.layout.simple_spinner_item, APIs);
+        dataAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        spinnerAPI.setAdapter(dataAdapter);
 
         EasyImage.configuration(this)
                 .setImagesFolderName("Softeng751")
@@ -169,19 +190,19 @@ public class MainActivity extends AppCompatActivity {
 
                 File image = imageFiles.get(0);
 
-                /*Bitmap bitmap = BitmapFactory.decodeFile(image.getAbsolutePath());
-
-                mainImage.setImageBitmap(bitmap);
-
-                imageDetails.setText(R.string.loading_message);
-
-                progressBar.setVisibility(View.VISIBLE);
-
-                processImageOnCloud(image);*/
-
-                Uri uri = Uri.fromFile(image);
-
-                uploadImage(uri);
+                switch (api) {
+                    case "AWS Tensorflow":
+                        Bitmap bitmap = BitmapFactory.decodeFile(image.getAbsolutePath());
+                        mainImage.setImageBitmap(bitmap);
+                        imageDetails.setText(R.string.loading_message);
+                        progressBar.setVisibility(View.VISIBLE);
+                        processImageOnCloud(image);
+                        break;
+                    case "Google Cloud Vision":
+                        Uri uri = Uri.fromFile(image);
+                        uploadImage(uri);
+                        break;
+                }
 
             }
 
@@ -383,6 +404,8 @@ public class MainActivity extends AppCompatActivity {
 
 
     private void processImageOnCloud(File file){
+
+
 
         // final TimingLogger logger = new TimingLogger(TAG, "processImageOnCloud");
 

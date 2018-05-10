@@ -27,6 +27,12 @@
                 android:scaleType="fitStart"
                 android:adjustViewBounds="true"/>
 
+            <Spinner
+                android:id="@+id/spinnerAPI"
+                android:layout_width="fill_parent"
+                android:layout_height="wrap_content"
+                android:layout_margin="@dimen/activity_horizontal_margin"/>
+
             <ProgressBar
                 android:id="@+id/image_Progress"
                 style="@style/Widget.AppCompat.ProgressBar.Horizontal"
