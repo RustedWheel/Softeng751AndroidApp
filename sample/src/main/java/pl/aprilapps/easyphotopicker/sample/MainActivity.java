@@ -44,8 +44,6 @@ import com.google.api.services.vision.v1.model.BatchAnnotateImagesResponse;
 import com.google.api.services.vision.v1.model.EntityAnnotation;
 import com.google.api.services.vision.v1.model.Feature;
 import com.google.api.services.vision.v1.model.Image;
-import com.google.api.services.vision.v1.model.ImageProperties;
-import com.google.api.services.vision.v1.model.SafeSearchAnnotation;
 
 import okhttp3.MediaType;
 import okhttp3.MultipartBody;
@@ -80,9 +78,11 @@ public class MainActivity extends AppCompatActivity {
 
     private Spinner spinnerAPI;
 
-    private String[] APIs = new String[]{"AWS Tensorflow", "Google Cloud Vision"};
+    private String[] APIs = new String[]{"AWS Tensorflow", "Azure Tensorflow", "Google Cloud Tensorflow", "Google Cloud Vision"};
 
     private String api = APIs[0];
+
+    private File imageFile;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -100,15 +100,23 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onItemSelected(AdapterView<?> adapterView, View view, int i, long l) {
                 api = (String) adapterView.getItemAtPosition(i);
+
+                if(imageFile != null){
+                    callCloudAPI(imageFile);
+                }
+
             }
             @Override
             public void onNothingSelected(AdapterView<?> adapterView) {
 
             }
         });
+
+
         ArrayAdapter<String> dataAdapter = new ArrayAdapter<String>(this, android.R.layout.simple_spinner_item, APIs);
         dataAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         spinnerAPI.setAdapter(dataAdapter);
+
 
         EasyImage.configuration(this)
                 .setImagesFolderName("Softeng751")
@@ -134,6 +142,7 @@ public class MainActivity extends AppCompatActivity {
                 EasyImage.openCamera(MainActivity.this, 0);
             }
         });
+
 
         findViewById(R.id.documents_button).setOnClickListener(new View.OnClickListener() {
             @Override
@@ -161,6 +170,7 @@ public class MainActivity extends AppCompatActivity {
 
     }
 
+
     private void checkGalleryAppAvailability() {
         if (!EasyImage.canDeviceHandleGallery(this)) {
             //Device has no app that handles gallery intent
@@ -168,11 +178,13 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+
     @Override
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         Nammu.onRequestPermissionsResult(requestCode, permissions, grantResults);
     }
+
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
@@ -189,20 +201,8 @@ public class MainActivity extends AppCompatActivity {
             public void onImagesPicked(List<File> imageFiles, EasyImage.ImageSource source, int type) {
 
                 File image = imageFiles.get(0);
-
-                switch (api) {
-                    case "AWS Tensorflow":
-                        Bitmap bitmap = BitmapFactory.decodeFile(image.getAbsolutePath());
-                        mainImage.setImageBitmap(bitmap);
-                        imageDetails.setText(R.string.loading_message);
-                        progressBar.setVisibility(View.VISIBLE);
-                        processImageOnCloud(image);
-                        break;
-                    case "Google Cloud Vision":
-                        Uri uri = Uri.fromFile(image);
-                        uploadImage(uri);
-                        break;
-                }
+                imageFile = image;
+                callCloudAPI(image);
 
             }
 
@@ -213,6 +213,78 @@ public class MainActivity extends AppCompatActivity {
                     File photoFile = EasyImage.lastlyTakenButCanceledPhoto(MainActivity.this);
                     if (photoFile != null) photoFile.delete();
                 }
+            }
+        });
+    }
+
+
+    private void callCloudAPI(File image){
+
+        ApiInterface apiInterface;
+
+        switch (api) {
+
+            case "AWS Tensorflow":
+                setLoadingUI(image);
+                apiInterface = ApiClient.getApiClientAWS().create(ApiInterface.class);
+                processImageOnCloud(image, apiInterface);
+                break;
+            case "Azure Tensorflow":
+                setLoadingUI(image);
+                apiInterface = ApiClient.getApiClientAzure().create(ApiInterface.class);
+                processImageOnCloud(image, apiInterface);
+                break;
+            case "Google Cloud Tensorflow":
+                setLoadingUI(image);
+                apiInterface = ApiClient.getApiClientGoogleCloud().create(ApiInterface.class);
+                processImageOnCloud(image, apiInterface);
+                break;
+            case "Google Cloud Vision":
+                Uri uri = Uri.fromFile(image);
+                uploadImage(uri);
+                break;
+        }
+
+    }
+
+
+    private void processImageOnCloud(File file, ApiInterface apiInterface){
+
+        MultipartBody.Part filePart = MultipartBody.Part.createFormData("file", file.getName(), RequestBody.create(MediaType.parse("image/*"), file));
+
+        Call<String> call = apiInterface.processImage(filePart);
+
+        long startTime = System.currentTimeMillis();
+
+        call.enqueue(new Callback<String>() {
+            @Override
+            public void onResponse(Call<String> call, Response<String> response) {
+
+                progressBar.setVisibility(View.INVISIBLE);
+
+                String responseMessage = null;
+
+                if(response.body() != null){
+                    responseMessage = response.body().toString();
+                    Log.d(TAG, "Response received! Value: " + responseMessage);
+
+                    long elapsedTime = System.currentTimeMillis() - startTime;
+
+                    imageDetails.setText(responseMessage + "\n\n" + "Total elapsed request/response time in milliseconds: " + elapsedTime);
+                } else {
+
+                    imageDetails.setText("Request failed!");
+                }
+
+            }
+
+            @Override
+            public void onFailure(Call<String> call, Throwable throwable) {
+
+                Log.d(TAG, "Request failed, exception: " + throwable.toString());
+
+                progressBar.setVisibility(View.INVISIBLE);
+                imageDetails.setText("Request failed!");
             }
         });
     }
@@ -348,12 +420,12 @@ public class MainActivity extends AppCompatActivity {
 
 
     private static String convertResponseToString(BatchAnnotateImagesResponse response) {
-        StringBuilder message = new StringBuilder("I found these things:\n\n");
+        StringBuilder message = new StringBuilder();
 
         List<EntityAnnotation> labels = response.getResponses().get(0).getLabelAnnotations();
         if (labels != null) {
             for (EntityAnnotation label : labels) {
-                message.append(String.format(Locale.US, "%.3f%%: %s", label.getScore()*100, label.getDescription()));
+                message.append(String.format(Locale.US, "%.3f%% %s", label.getScore()*100, label.getDescription()));
                 message.append("\n");
             }
         } else {
@@ -368,6 +440,8 @@ public class MainActivity extends AppCompatActivity {
     private static class LableDetectionTask extends AsyncTask<Object, Void, String> {
         private final WeakReference<MainActivity> mActivityWeakReference;
         private Vision.Images.Annotate mRequest;
+        private long startTime;
+        private long elapsedTime;
 
         LableDetectionTask(MainActivity activity, Vision.Images.Annotate annotate) {
             mActivityWeakReference = new WeakReference<>(activity);
@@ -378,7 +452,9 @@ public class MainActivity extends AppCompatActivity {
         protected String doInBackground(Object... params) {
             try {
                 Log.d(TAG, "created Cloud Vision request object, sending request");
+                startTime = System.currentTimeMillis();
                 BatchAnnotateImagesResponse response = mRequest.execute();
+                elapsedTime = System.currentTimeMillis() - startTime;
                 return convertResponseToString(response);
 
             } catch (GoogleJsonResponseException e) {
@@ -394,7 +470,7 @@ public class MainActivity extends AppCompatActivity {
             MainActivity activity = mActivityWeakReference.get();
             if (activity != null && !activity.isFinishing()) {
                 TextView imageDetail = activity.findViewById(R.id.image_details);
-                imageDetail.setText(result);
+                imageDetail.setText(result + "\n\n" + "Total elapsed request/response time in milliseconds: " + elapsedTime);
                 ProgressBar progress = activity.findViewById(R.id.image_Progress);
                 progress.setVisibility(View.INVISIBLE);
 
@@ -403,44 +479,11 @@ public class MainActivity extends AppCompatActivity {
     }
 
 
-    private void processImageOnCloud(File file){
-
-
-
-        // final TimingLogger logger = new TimingLogger(TAG, "processImageOnCloud");
-
-        MultipartBody.Part filePart = MultipartBody.Part.createFormData("file", file.getName(), RequestBody.create(MediaType.parse("image/*"), file));
-
-        ApiInterface apiInterface = ApiClient.getApiClient().create(ApiInterface.class);
-
-        Call<String> call = apiInterface.processImage(filePart);
-
-        call.enqueue(new Callback<String>() {
-            @Override
-            public void onResponse(Call<String> call, Response<String> response) {
-
-                /*logger.addSplit("Success");
-                logger.dumpToLog();*/
-
-                String responseMessage = response.body().toString();
-                Log.d(TAG, "Response received! Value: " + responseMessage);
-
-                progressBar.setVisibility(View.INVISIBLE);
-                imageDetails.setText(responseMessage);
-            }
-
-            @Override
-            public void onFailure(Call<String> call, Throwable throwable) {
-
-                /*logger.addSplit("Failed");
-                logger.dumpToLog();*/
-
-                Log.d(TAG, "Request failed, exception: " + throwable.toString());
-
-                progressBar.setVisibility(View.INVISIBLE);
-                imageDetails.setText("Request failed!");
-            }
-        });
+    private void setLoadingUI(File image){
+        Bitmap bitmap = BitmapFactory.decodeFile(image.getAbsolutePath());
+        mainImage.setImageBitmap(bitmap);
+        imageDetails.setText(R.string.loading_message);
+        progressBar.setVisibility(View.VISIBLE);
     }
 
 
