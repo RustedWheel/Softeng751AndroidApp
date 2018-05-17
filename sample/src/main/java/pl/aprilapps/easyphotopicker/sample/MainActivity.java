@@ -21,6 +21,8 @@ import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
 
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
@@ -62,11 +64,21 @@ public class MainActivity extends AppCompatActivity {
     private static final String TAG = "MainActivity";
 
     private static final String CLOUD_VISION_API_KEY = BuildConfig.API_KEY;
-    public static final String FILE_NAME = "temp.jpg";
     private static final String ANDROID_CERT_HEADER = "X-Android-Cert";
     private static final String ANDROID_PACKAGE_HEADER = "X-Android-Package";
     private static final int MAX_LABEL_RESULTS = 10;
     private static final int MAX_DIMENSION = 1200;
+    private static final int INPUT_SIZE = 224;
+    private static final int IMAGE_MEAN = 117;
+    private static final float IMAGE_STD = 1;
+    private static final String INPUT_NAME = "input";
+    private static final String OUTPUT_NAME = "output";
+
+    private static final String MODEL_FILE = "file:///android_asset/tensorflow_inception_graph.pb";
+    private static final String LABEL_FILE = "file:///android_asset/imagenet_comp_graph_label_strings.txt";
+
+    private Classifier classifier;
+    private Executor executor = Executors.newSingleThreadExecutor();
 
     protected View galleryButton;
 
@@ -78,7 +90,7 @@ public class MainActivity extends AppCompatActivity {
 
     private Spinner spinnerAPI;
 
-    private String[] APIs = new String[]{"AWS Tensorflow", "Azure Tensorflow", "Google Cloud Tensorflow", "Google Cloud Vision"};
+    private String[] APIs = new String[]{"Local Tensorflow", "AWS Tensorflow", "Azure Tensorflow", "Google Cloud Tensorflow", "Google Cloud Vision"};
 
     private String api = APIs[0];
 
@@ -89,6 +101,8 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         Nammu.init(this);
+
+        initiateTensorFlowClassifier();
 
         mainImage = findViewById(R.id.main_image);
         imageDetails = findViewById(R.id.image_details);
@@ -102,7 +116,7 @@ public class MainActivity extends AppCompatActivity {
                 api = (String) adapterView.getItemAtPosition(i);
 
                 if(imageFile != null){
-                    callCloudAPI(imageFile);
+                    callAPI(imageFile);
                 }
 
             }
@@ -126,16 +140,6 @@ public class MainActivity extends AppCompatActivity {
 
         checkGalleryAppAvailability();
 
-
-        findViewById(R.id.gallery_button).setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                /** Some devices such as Samsungs which have their own gallery app require write permission. Testing is advised! */
-                EasyImage.openGallery(MainActivity.this, 0);
-            }
-        });
-
-
         findViewById(R.id.camera_button).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
@@ -144,7 +148,7 @@ public class MainActivity extends AppCompatActivity {
         });
 
 
-        findViewById(R.id.documents_button).setOnClickListener(new View.OnClickListener() {
+        findViewById(R.id.gallery_button).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
                 /** Some devices such as Samsungs which have their own gallery app require write permission. Testing is advised! */
@@ -202,7 +206,7 @@ public class MainActivity extends AppCompatActivity {
 
                 File image = imageFiles.get(0);
                 imageFile = image;
-                callCloudAPI(image);
+                callAPI(image);
 
             }
 
@@ -218,12 +222,16 @@ public class MainActivity extends AppCompatActivity {
     }
 
 
-    private void callCloudAPI(File image){
+    private void callAPI(File image){
 
         ApiInterface apiInterface;
 
         switch (api) {
-
+            case "Local Tensorflow":
+                setLoadingUI(image);
+                LocalOjectDetector detectionTask = new LocalOjectDetector(this, image);
+                detectionTask.execute();
+                break;
             case "AWS Tensorflow":
                 setLoadingUI(image);
                 apiInterface = ApiClient.getApiClientAWS().create(ApiInterface.class);
@@ -247,6 +255,54 @@ public class MainActivity extends AppCompatActivity {
 
     }
 
+    private class LocalOjectDetector extends AsyncTask<Void, Void, Classifier.Recognition> {
+
+        private final WeakReference<MainActivity> mActivityWeakReference;
+        private File imageFile;
+        private long startTime;
+
+        LocalOjectDetector(MainActivity activity, File image) {
+            mActivityWeakReference = new WeakReference<>(activity);
+            imageFile = image;
+        }
+
+        @Override
+        protected Classifier.Recognition doInBackground(Void... params) {
+
+            startTime = System.currentTimeMillis();
+            Bitmap bitmap = BitmapFactory.decodeFile(imageFile.getAbsolutePath());
+            bitmap = Bitmap.createScaledBitmap(bitmap, INPUT_SIZE, INPUT_SIZE, false);
+            final List<Classifier.Recognition> results = classifier.recognizeImage(bitmap);
+
+            Classifier.Recognition result = results.get(0);
+
+            return result;
+        }
+
+        @Override
+        protected void onPostExecute(Classifier.Recognition result) {
+
+            MainActivity activity = mActivityWeakReference.get();
+            if (activity != null && !activity.isFinishing()) {
+
+                if(result != null){
+                    TextView imageDetail = activity.findViewById(R.id.image_details);
+                    String bestMatch = String.format("BEST MATCH: %s (%.2f%% likely)",
+                            result.getTitle(),
+                            result.getConfidence() * 100f);
+
+                    long elapsedTime = System.currentTimeMillis() - startTime;
+
+                    imageDetail.setText(bestMatch + "\n\n" + "Total elapsed request/response time in milliseconds: " + elapsedTime);
+                    ProgressBar progress = activity.findViewById(R.id.image_Progress);
+                    progress.setVisibility(View.INVISIBLE);
+                }
+
+            }
+
+        }
+    }
+
 
     private void processImageOnCloud(File file, ApiInterface apiInterface){
 
@@ -262,7 +318,7 @@ public class MainActivity extends AppCompatActivity {
 
                 progressBar.setVisibility(View.INVISIBLE);
 
-                String responseMessage = null;
+                String responseMessage;
 
                 if(response.body() != null){
                     responseMessage = response.body().toString();
@@ -297,7 +353,7 @@ public class MainActivity extends AppCompatActivity {
                 Bitmap bitmap =
                         scaleBitmapDown(
                                 MediaStore.Images.Media.getBitmap(getContentResolver(), uri),
-                                MAX_DIMENSION);
+                                MAX_DIMENSION,MAX_DIMENSION);
 
                 mainImage.setImageBitmap(bitmap);
 
@@ -389,7 +445,7 @@ public class MainActivity extends AppCompatActivity {
 
         // Do the real work in an async task, because we need to use the network anyway
         try {
-            AsyncTask<Object, Void, String> labelDetectionTask = new LableDetectionTask(this, prepareAnnotationRequest(bitmap));
+            AsyncTask<Object, Void, String> labelDetectionTask = new GoogleCloudObjectDetectionTask(this, prepareAnnotationRequest(bitmap));
             labelDetectionTask.execute();
         } catch (IOException e) {
             Log.d(TAG, "failed to make API request because of other IOException " +
@@ -398,22 +454,22 @@ public class MainActivity extends AppCompatActivity {
     }
 
 
-    private Bitmap scaleBitmapDown(Bitmap bitmap, int maxDimension) {
+    private Bitmap scaleBitmapDown(Bitmap bitmap, int maxWidthDimension, int maxHeightDimension) {
 
         int originalWidth = bitmap.getWidth();
         int originalHeight = bitmap.getHeight();
-        int resizedWidth = maxDimension;
-        int resizedHeight = maxDimension;
+        int resizedWidth = maxWidthDimension;
+        int resizedHeight = maxHeightDimension;
 
         if (originalHeight > originalWidth) {
-            resizedHeight = maxDimension;
+            resizedHeight = maxHeightDimension;
             resizedWidth = (int) (resizedHeight * (float) originalWidth / (float) originalHeight);
         } else if (originalWidth > originalHeight) {
-            resizedWidth = maxDimension;
+            resizedWidth = maxWidthDimension;
             resizedHeight = (int) (resizedWidth * (float) originalHeight / (float) originalWidth);
         } else if (originalHeight == originalWidth) {
-            resizedHeight = maxDimension;
-            resizedWidth = maxDimension;
+            resizedHeight = maxHeightDimension;
+            resizedWidth = maxWidthDimension;
         }
         return Bitmap.createScaledBitmap(bitmap, resizedWidth, resizedHeight, false);
     }
@@ -437,13 +493,13 @@ public class MainActivity extends AppCompatActivity {
 
 
     // Unused
-    private static class LableDetectionTask extends AsyncTask<Object, Void, String> {
+    private static class GoogleCloudObjectDetectionTask extends AsyncTask<Object, Void, String> {
         private final WeakReference<MainActivity> mActivityWeakReference;
         private Vision.Images.Annotate mRequest;
         private long startTime;
         private long elapsedTime;
 
-        LableDetectionTask(MainActivity activity, Vision.Images.Annotate annotate) {
+        GoogleCloudObjectDetectionTask(MainActivity activity, Vision.Images.Annotate annotate) {
             mActivityWeakReference = new WeakReference<>(activity);
             mRequest = annotate;
         }
@@ -487,11 +543,52 @@ public class MainActivity extends AppCompatActivity {
     }
 
 
+    private void initiateTensorFlowClassifier() {
+        executor.execute(new Runnable() {
+            @Override
+            public void run() {
+                try {
+
+                    classifier = TensorFlowImageClassifier.create(
+                            getAssets(),
+                            MODEL_FILE,
+                            LABEL_FILE,
+                            INPUT_SIZE,
+                            IMAGE_MEAN,
+                            IMAGE_STD,
+                            INPUT_NAME,
+                            OUTPUT_NAME);
+
+                } catch (final Exception e) {
+                    throw new RuntimeException("Error initializing TensorFlow!", e);
+                }
+            }
+        });
+    }
+
+
+    private void disableUIComponents(){
+
+    }
+
+
+    private void enableUIComponents(){
+
+    }
+
+
+
     @Override
     protected void onDestroy() {
         // Clear any configuration that was done!
         EasyImage.clearConfiguration(this);
         super.onDestroy();
+        executor.execute(new Runnable() {
+            @Override
+            public void run() {
+                classifier.close();
+            }
+        });
     }
 
 }
