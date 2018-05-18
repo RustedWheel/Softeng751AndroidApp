@@ -4,7 +4,7 @@ android {
     compileSdkVersion compile_sdk_version
 
     defaultConfig {
-        applicationId "pl.aprilapps.easyphotopicker.sample"
+        applicationId "pl.aprilapps.easyphotopicker.ObjectDetection"
         minSdkVersion min_sdk_version
         targetSdkVersion target_sdk_version
         versionCode version_code

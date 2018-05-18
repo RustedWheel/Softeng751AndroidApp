@@ -1,7 +1,6 @@
-package pl.aprilapps.easyphotopicker.sample;
+package pl.aprilapps.easyphotopicker.ObjectDetection;
 
 import android.graphics.Bitmap;
-import android.graphics.RectF;
 
 import java.util.List;
 

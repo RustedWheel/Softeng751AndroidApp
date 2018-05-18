@@ -1,4 +1,4 @@
-package pl.aprilapps.easyphotopicker.sample;
+package pl.aprilapps.easyphotopicker.ObjectDetection;
 
 import retrofit2.Retrofit;
 import retrofit2.converter.gson.GsonConverterFactory;

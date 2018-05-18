@@ -1,8 +1,7 @@
-package pl.aprilapps.easyphotopicker.sample;
+package pl.aprilapps.easyphotopicker.ObjectDetection;
 
 import android.content.res.AssetManager;
 import android.graphics.Bitmap;
-import android.support.v4.os.TraceCompat;
 import android.util.Log;
 
 import org.tensorflow.contrib.android.TensorFlowInferenceInterface;

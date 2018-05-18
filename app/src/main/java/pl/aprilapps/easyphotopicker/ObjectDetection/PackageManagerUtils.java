@@ -1,4 +1,4 @@
-package pl.aprilapps.easyphotopicker.sample;
+package pl.aprilapps.easyphotopicker.ObjectDetection;
 
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;

@@ -1,4 +1,4 @@
-package pl.aprilapps.easyphotopicker.sample;
+package pl.aprilapps.easyphotopicker.ObjectDetection;
 
 import android.Manifest;
 import android.content.Intent;
@@ -26,7 +26,6 @@ import java.util.concurrent.Executors;
 
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
-import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.ProgressBar;
 import android.widget.Spinner;
@@ -311,13 +310,13 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onResponse(Call<String> call, Response<String> response) {
 
+                long elapsedTime = System.currentTimeMillis() - startTime;
+
                 String responseMessage;
 
                 if(response.body() != null){
                     responseMessage = response.body().toString();
                     Log.d(TAG, "Response received! Value: " + responseMessage);
-
-                    long elapsedTime = System.currentTimeMillis() - startTime;
 
                     imageDetails.setText(responseMessage + "\n\n" + "Total elapsed request/response time in milliseconds: " + elapsedTime);
                 } else {
