@@ -26,6 +26,7 @@ import java.util.concurrent.Executors;
 
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
+import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.ProgressBar;
 import android.widget.Spinner;
@@ -62,75 +63,44 @@ import retrofit2.Response;
 public class MainActivity extends AppCompatActivity {
 
     private static final String TAG = "MainActivity";
-
     private static final String CLOUD_VISION_API_KEY = BuildConfig.API_KEY;
     private static final String ANDROID_CERT_HEADER = "X-Android-Cert";
     private static final String ANDROID_PACKAGE_HEADER = "X-Android-Package";
+    private static final String INPUT_NAME = "input";
+    private static final String OUTPUT_NAME = "output";
+    private static final String MODEL_FILE = "file:///android_asset/tensorflow_inception_graph.pb";
+    private static final String LABEL_FILE = "file:///android_asset/imagenet_comp_graph_label_strings.txt";
     private static final int MAX_LABEL_RESULTS = 10;
     private static final int MAX_DIMENSION = 1200;
     private static final int INPUT_SIZE = 224;
     private static final int IMAGE_MEAN = 117;
     private static final float IMAGE_STD = 1;
-    private static final String INPUT_NAME = "input";
-    private static final String OUTPUT_NAME = "output";
-
-    private static final String MODEL_FILE = "file:///android_asset/tensorflow_inception_graph.pb";
-    private static final String LABEL_FILE = "file:///android_asset/imagenet_comp_graph_label_strings.txt";
-
-    private Classifier classifier;
-    private Executor executor = Executors.newSingleThreadExecutor();
-
-    protected View galleryButton;
-
-    private ImageView mainImage;
-
-    private TextView imageDetails;
-
-    private ProgressBar progressBar;
-
-    private Spinner spinnerAPI;
-
-    private String[] APIs = new String[]{"Local Tensorflow", "AWS Tensorflow", "Azure Tensorflow", "Google Cloud Tensorflow", "Google Cloud Vision"};
-
+    private static final String[] APIs = new String[]{"Local Tensorflow", "AWS Tensorflow", "Azure Tensorflow", "Google Cloud Tensorflow", "Google Cloud Vision"};
     private String api = APIs[0];
 
     private File imageFile;
+    private Classifier classifier;
+    private Executor executor = Executors.newSingleThreadExecutor();
+
+    private View cameraButton;
+    protected View galleryButton;
+    private ImageView mainImage;
+    private TextView imageDetails;
+    private ProgressBar progressBar;
+    private Spinner spinnerAPI;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         Nammu.init(this);
-
         initiateTensorFlowClassifier();
-
         mainImage = findViewById(R.id.main_image);
         imageDetails = findViewById(R.id.image_details);
         progressBar = findViewById(R.id.image_Progress);
+        cameraButton = findViewById(R.id.camera_button);
         galleryButton = findViewById(R.id.gallery_button);
         spinnerAPI = findViewById(R.id.spinnerAPI);
-
-        spinnerAPI.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
-            @Override
-            public void onItemSelected(AdapterView<?> adapterView, View view, int i, long l) {
-                api = (String) adapterView.getItemAtPosition(i);
-
-                if(imageFile != null){
-                    callAPI(imageFile);
-                }
-
-            }
-            @Override
-            public void onNothingSelected(AdapterView<?> adapterView) {
-
-            }
-        });
-
-
-        ArrayAdapter<String> dataAdapter = new ArrayAdapter<String>(this, android.R.layout.simple_spinner_item, APIs);
-        dataAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-        spinnerAPI.setAdapter(dataAdapter);
-
 
         EasyImage.configuration(this)
                 .setImagesFolderName("Softeng751")
@@ -172,6 +142,25 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
+        spinnerAPI.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> adapterView, View view, int i, long l) {
+                api = (String) adapterView.getItemAtPosition(i);
+
+                if(imageFile != null){
+                    callAPI(imageFile);
+                }
+
+            }
+            @Override
+            public void onNothingSelected(AdapterView<?> adapterView) {
+
+            }
+        });
+
+        ArrayAdapter<String> dataAdapter = new ArrayAdapter<String>(this, android.R.layout.simple_spinner_item, APIs);
+        dataAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        spinnerAPI.setAdapter(dataAdapter);
     }
 
 
@@ -229,25 +218,30 @@ public class MainActivity extends AppCompatActivity {
         switch (api) {
             case "Local Tensorflow":
                 setLoadingUI(image);
+                disableUIComponents();
                 LocalOjectDetector detectionTask = new LocalOjectDetector(this, image);
                 detectionTask.execute();
                 break;
             case "AWS Tensorflow":
                 setLoadingUI(image);
+                disableUIComponents();
                 apiInterface = ApiClient.getApiClientAWS().create(ApiInterface.class);
                 processImageOnCloud(image, apiInterface);
                 break;
             case "Azure Tensorflow":
                 setLoadingUI(image);
+                disableUIComponents();
                 apiInterface = ApiClient.getApiClientAzure().create(ApiInterface.class);
                 processImageOnCloud(image, apiInterface);
                 break;
             case "Google Cloud Tensorflow":
                 setLoadingUI(image);
+                disableUIComponents();
                 apiInterface = ApiClient.getApiClientGoogleCloud().create(ApiInterface.class);
                 processImageOnCloud(image, apiInterface);
                 break;
             case "Google Cloud Vision":
+                disableUIComponents();
                 Uri uri = Uri.fromFile(image);
                 uploadImage(uri);
                 break;
@@ -296,6 +290,7 @@ public class MainActivity extends AppCompatActivity {
                     imageDetail.setText(bestMatch + "\n\n" + "Total elapsed request/response time in milliseconds: " + elapsedTime);
                     ProgressBar progress = activity.findViewById(R.id.image_Progress);
                     progress.setVisibility(View.INVISIBLE);
+                    enableUIComponents();
                 }
 
             }
@@ -316,8 +311,6 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onResponse(Call<String> call, Response<String> response) {
 
-                progressBar.setVisibility(View.INVISIBLE);
-
                 String responseMessage;
 
                 if(response.body() != null){
@@ -331,6 +324,8 @@ public class MainActivity extends AppCompatActivity {
 
                     imageDetails.setText("Request failed!");
                 }
+                progressBar.setVisibility(View.INVISIBLE);
+                enableUIComponents();
 
             }
 
@@ -341,6 +336,7 @@ public class MainActivity extends AppCompatActivity {
 
                 progressBar.setVisibility(View.INVISIBLE);
                 imageDetails.setText("Request failed!");
+                enableUIComponents();
             }
         });
     }
@@ -493,7 +489,7 @@ public class MainActivity extends AppCompatActivity {
 
 
     // Unused
-    private static class GoogleCloudObjectDetectionTask extends AsyncTask<Object, Void, String> {
+    private class GoogleCloudObjectDetectionTask extends AsyncTask<Object, Void, String> {
         private final WeakReference<MainActivity> mActivityWeakReference;
         private Vision.Images.Annotate mRequest;
         private long startTime;
@@ -529,7 +525,7 @@ public class MainActivity extends AppCompatActivity {
                 imageDetail.setText(result + "\n\n" + "Total elapsed request/response time in milliseconds: " + elapsedTime);
                 ProgressBar progress = activity.findViewById(R.id.image_Progress);
                 progress.setVisibility(View.INVISIBLE);
-
+                enableUIComponents();
             }
         }
     }
@@ -544,38 +540,36 @@ public class MainActivity extends AppCompatActivity {
 
 
     private void initiateTensorFlowClassifier() {
-        executor.execute(new Runnable() {
-            @Override
-            public void run() {
-                try {
+        try {
 
-                    classifier = TensorFlowImageClassifier.create(
-                            getAssets(),
-                            MODEL_FILE,
-                            LABEL_FILE,
-                            INPUT_SIZE,
-                            IMAGE_MEAN,
-                            IMAGE_STD,
-                            INPUT_NAME,
-                            OUTPUT_NAME);
+            classifier = TensorFlowImageClassifier.create(
+                    getAssets(),
+                    MODEL_FILE,
+                    LABEL_FILE,
+                    INPUT_SIZE,
+                    IMAGE_MEAN,
+                    IMAGE_STD,
+                    INPUT_NAME,
+                    OUTPUT_NAME);
 
-                } catch (final Exception e) {
-                    throw new RuntimeException("Error initializing TensorFlow!", e);
-                }
-            }
-        });
+        } catch (final Exception e) {
+            throw new RuntimeException("Error initializing TensorFlow!", e);
+        }
     }
 
 
     private void disableUIComponents(){
-
+        cameraButton.setEnabled(false);
+        galleryButton.setEnabled(false);
+        spinnerAPI.setEnabled(false);
     }
 
 
     private void enableUIComponents(){
-
+        cameraButton.setEnabled(true);
+        galleryButton.setEnabled(true);
+        spinnerAPI.setEnabled(true);
     }
-
 
 
     @Override

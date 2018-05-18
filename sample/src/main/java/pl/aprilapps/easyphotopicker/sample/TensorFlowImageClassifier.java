@@ -14,7 +14,6 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.PriorityQueue;
-import java.util.Vector;
 
 /**
  * A classifier specialized to label images using TensorFlow.
@@ -127,6 +126,14 @@ public class TensorFlowImageClassifier implements Classifier {
         inferenceInterface.run(outputNames, runStats);
         inferenceInterface.fetch(outputName, outputs);
 
+        List<Recognition> sortedRecognitions = getResults();
+
+        return sortedRecognitions;
+    }
+
+
+    private List<Recognition> getResults(){
+
         // Find the best classifications.
         PriorityQueue<Recognition> pq =
                 new PriorityQueue<Recognition>(
@@ -139,7 +146,7 @@ public class TensorFlowImageClassifier implements Classifier {
                             }
                         });
         for (int i = 0; i < outputs.length; ++i) {
-                pq.add(new Recognition("" + i, labels.size() > i ? labels.get(i) : "unknown", outputs[i]));
+            pq.add(new Recognition("" + i, labels.size() > i ? labels.get(i) : "unknown", outputs[i]));
         }
         final ArrayList<Recognition> recognitions = new ArrayList<Recognition>();
         int recognitionsSize = Math.min(pq.size(), MAX_RESULTS);
@@ -148,6 +155,7 @@ public class TensorFlowImageClassifier implements Classifier {
         }
         return recognitions;
     }
+
 
     @Override
     public void close() {
