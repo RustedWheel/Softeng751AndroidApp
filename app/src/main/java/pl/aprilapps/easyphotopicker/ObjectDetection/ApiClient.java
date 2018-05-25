@@ -6,7 +6,7 @@ import retrofit2.converter.scalars.ScalarsConverterFactory;
 
 public class ApiClient {
 
-    private static final String AWS_BASE_URL = "http://recog-env-1.ztppawaibd.ap-southeast-2.elasticbeanstalk.com/rest/";
+    private static final String AWS_BASE_URL = "http://recog-env.ztppawaibd.ap-southeast-2.elasticbeanstalk.com/rest/";
     private static final String AZURE_BASE_URL = "https://objectrecognition.azurewebsites.net/rest/";
     private static final String GOOGLE_CLOUD_BASE_URL = "https://softeng751-203910.appspot.com/rest/";
 
